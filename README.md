@@ -1,5 +1,7 @@
 # AirWrapperLLM
 
+**Version 1.0 — first stable release.**
+
 An **OpenAI-compatible FastAPI server that wraps [AirLLM](https://github.com/lyogavin/airllm)**, exposing memory-frugal disk-streaming inference as a standard HTTP API.
 
 AirLLM lets you run models far larger than your VRAM by streaming layers / experts from disk into the GPU one at a time. The catch is that **AirLLM does not ship with a server**. AirWrapperLLM fills that gap.
@@ -36,6 +38,44 @@ AirLLM lets you run models far larger than your VRAM by streaming layers / exper
 * Single-process, single-GPU; serializes generation through a global lock (AirLLM is single-tenant by design)
 
 The XTML output parser lives in a dependency-free module (`airwrapper_xtml.py`) with unit tests — easy to reuse elsewhere.
+
+---
+
+## Use AirWrapperLLM as a backend for your AI agent
+
+AirWrapperLLM speaks the **OpenAI HTTP API**, so any agent that supports an OpenAI-compatible `base_url` can drive it — without code changes. Just point your agent at `http://host:port/v1` with the Bearer token.
+
+| Agent | How to point it at AirWrapperLLM |
+|---|---|
+| **Hermes Agent** (`NousResearch/hermes-agent`) | Edit `~/.hermes/config.yaml`: set `model.base_url: "http://<host>:20002/v1"` and `model.api_key: "<your air-... key>"`. The gateway routes `/v1/chat/completions` straight through. |
+| **OpenClaw / openclaw-agent** | In your runtime config, set `LLM_BASE_URL=http://<host>:20002/v1` and `LLM_API_KEY=<your air-... key>`. OpenClaw's OpenAI adapter takes over from there. |
+| **OpenCode / opencode-ai** | Set `OPENAI_API_BASE=http://<host>:20002/v1` and `OPENAI_API_KEY=<your air-... key>` (the value just has to be non-empty if you've disabled auth, or the matching `air-...` string if you haven't). |
+| **Anything else** (Aider, Cline, Continue, Roo Code, LangChain, LiteLLM, etc.) | Wherever the agent asks for an OpenAI `base_url` and `api_key`, supply `http://<host>:20002/v1` and your `air-...` key. |
+
+**Workflow in three lines:**
+
+```bash
+# 1. Run the server (AirLLM does the disk-streaming, AirWrapperLLM serves it)
+./launch_docker.sh   # prints the API key on stdout
+
+# 2. Configure your agent to use that endpoint
+export OPENAI_API_BASE=http://localhost:20002/v1
+export OPENAI_API_KEY=air-XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# 3. Use your agent normally — it now runs against your local AirLLM model
+```
+
+**What works through the agent:**
+
+* **Multi-turn conversations** — the agent keeps context, AirWrapperLLM passes it through.
+* **Tool calling** — the agent's tool-calling loop drives `tools=[...]` directly through the OpenAI schema; AirWrapperLLM parses the model's XTML `<tools>` channel and returns standard `tool_calls`.
+* **Reasoning / thinking** — pass `reasoning={"effort": "high"}` in the agent's request payload (or use `extra_body={"chat_template_kwargs": {"enable_thinking": True}}`); the model's thinking trace comes back in `message.reasoning`.
+
+**What to watch out for:**
+
+* **Latency.** AirLLM streams layers from disk for *every* token, so first-token latency is on the order of tens of seconds to minutes depending on model size and disk bandwidth. Interactive agents feel sluggish — best suited to batch jobs, deep research, or background tasks.
+* **No streaming tokens.** AirLLM returns the full sequence only after the last token; AirWrapperLLM emits the parsed result as SSE deltas when the run finishes. Agents that show a live token stream will see everything arrive in one batch.
+* **Single-tenant.** One generation runs at a time per server. Multi-agent setups need multiple servers (or a queue in front).
 
 ---
 

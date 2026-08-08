@@ -48,6 +48,10 @@ LOAD_LOCK = threading.Lock()
 GEN_LOCK = threading.Lock()    # AirLLM is single-tenant; serialise generation
 START_TIME = time.time()
 
+# Semantic version. Bump on release. Keep in sync with the README header
+# and the git tag (e.g. `git tag -a v1.0.0 -m "v1.0 release"`).
+__version__ = "1.0.0"
+
 # ─────────────────────────── auth ───────────────────────────
 
 API_KEY_FILE = os.environ.get("AIRWRAPPER_API_KEY_FILE", "/tmp/.airwrapper_api_key")
@@ -225,18 +229,20 @@ def _generate(raw_prompt: str, max_new_tokens: int, temperature: float,
 # ─────────────────────────── FastAPI app ───────────────────────────
 
 
-app = FastAPI(title="AirWrapperLLM", version="1.0.0")
+app = FastAPI(title="AirWrapperLLM", version=__version__)
 
 
 @app.get("/")
 async def root():
-    return {"service": "AirWrapperLLM", "status": "ok"}
+    return {"service": "AirWrapperLLM", "version": __version__, "status": "ok"}
 
 
 @app.get("/health")
 async def health():
     ready = AIR_MODEL is not None
-    return {"status": "ready" if ready else "loading", "model": MODEL_ID,
+    return {"status": "ready" if ready else "loading",
+            "version": __version__,
+            "model": MODEL_ID,
             "uptime": time.time() - START_TIME}
 
 
