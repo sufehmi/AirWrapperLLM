@@ -1,0 +1,31 @@
+# Pinned for AirLLM 3.x + Kimi K3 / similar MoE-Hybrid models.
+# Install torch first with the CUDA wheel matching your driver:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# Then:  pip install -r requirements.txt
+
+# Core engine (AirLLM streams layers from disk into the GPU).
+airllm>=3.0,<4
+
+# Hugging Face stack (4.56.x required by Kimi K3's remote modeling code).
+transformers>=4.56,<4.57
+huggingface_hub>=0.30
+hf_transfer>=0.1
+
+# Required by AirLLM's compression mode and Kimi K3's remote code.
+bitsandbytes>=0.45
+compressed-tensors>=0.10
+accelerate>=1.0
+
+# Kimi K3 needs both of these at runtime.
+tiktoken>=0.8
+fla-core>=0.5
+
+# Server.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.0
+
+# Optional but recommended for Kimi K3: flash-attn 2.8.3 with cu128 build.
+# Not in this file because it requires a source compile against a CUDA
+# toolkit matching your torch wheel. Install manually:
+#   CUDA_HOME=/usr/local/cuda-12.8 pip install flash-attn --no-build-isolation
